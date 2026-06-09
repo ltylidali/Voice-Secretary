@@ -9,6 +9,16 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel = AppViewModel()
+    @State private var selectedHistoryType: HistoryType = .reminders
+
+    private enum HistoryType: String, CaseIterable, Identifiable {
+        case reminders = "Reminders"
+        case shopping = "Shopping"
+
+        var id: String {
+            rawValue
+        }
+    }
 
     var body: some View {
         TabView {
@@ -103,20 +113,22 @@ struct ContentView: View {
 
                 Spacer()
 
-                Button("Confirm Save") {
-                    viewModel.confirmSave()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
-                .disabled(viewModel.reviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                HStack {
+                    Button("Edit", role: .cancel) {
+                        viewModel.cancelReview()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
 
-                Button("Edit", role: .cancel) {
-                    viewModel.cancelReview()
+                    Button("Save") {
+                        viewModel.confirmSave()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                    .disabled(viewModel.reviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
             }
             .padding()
             .navigationTitle("Review Before Saving")
@@ -188,24 +200,35 @@ struct ContentView: View {
     private var historyTab: some View {
         NavigationStack {
             List {
-                Section("Reminder History") {
-                    if viewModel.reminderItems.isEmpty {
-                        Text("No reminders yet")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(viewModel.reminderItems) { item in
-                            reminderRow(for: item)
+                Section {
+                    Picker("History Type", selection: $selectedHistoryType) {
+                        ForEach(HistoryType.allCases) { historyType in
+                            Text(historyType.rawValue).tag(historyType)
                         }
                     }
+                    .pickerStyle(.segmented)
                 }
 
-                Section("Shopping History") {
-                    if viewModel.shoppingItems.isEmpty {
-                        Text("No shopping items yet")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(viewModel.shoppingItems) { item in
-                            shoppingRow(for: item)
+                if selectedHistoryType == .reminders {
+                    Section("Reminder History") {
+                        if viewModel.reminderItems.isEmpty {
+                            Text("No reminders yet")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(historyReminderItems) { item in
+                                reminderRow(for: item)
+                            }
+                        }
+                    }
+                } else {
+                    Section("Shopping History") {
+                        if viewModel.shoppingItems.isEmpty {
+                            Text("No shopping items yet")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(historyShoppingItems) { item in
+                                shoppingRow(for: item)
+                            }
                         }
                     }
                 }
@@ -220,6 +243,18 @@ struct ContentView: View {
 
     private var activeShoppingItems: [ShoppingItem] {
         viewModel.shoppingItems.filter { $0.isCompleted == false }
+    }
+
+    private var historyReminderItems: [ReminderItem] {
+        viewModel.reminderItems.sorted { first, second in
+            first.isCompleted && second.isCompleted == false
+        }
+    }
+
+    private var historyShoppingItems: [ShoppingItem] {
+        viewModel.shoppingItems.sorted { first, second in
+            first.isCompleted && second.isCompleted == false
+        }
     }
 
     private func reminderRow(for item: ReminderItem) -> some View {
