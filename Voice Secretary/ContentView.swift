@@ -12,28 +12,53 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                inputSection
-                journalSection
-                remindersSection
-                shoppingSection
+            VStack(spacing: 0) {
+                activeInbox
+                Divider()
+                inputComposer
             }
             .navigationTitle("Voice Secretary")
+            .toolbar {
+                NavigationLink("History") {
+                    historyView
+                }
+            }
             .sheet(isPresented: $viewModel.isReviewing) {
                 reviewSheet
             }
         }
     }
 
-    private var inputSection: some View {
-        Section("New Note") {
+    private var activeInbox: some View {
+        List {
+            Section("Active Inbox") {
+                if activeReminderItems.isEmpty && activeShoppingItems.isEmpty {
+                    Text("You're all caught up.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(activeReminderItems) { item in
+                        reminderRow(for: item)
+                    }
+
+                    ForEach(activeShoppingItems) { item in
+                        shoppingRow(for: item)
+                    }
+                }
+            }
+        }
+    }
+
+    private var inputComposer: some View {
+        VStack(alignment: .leading, spacing: 12) {
             TextField("Type a short note", text: $viewModel.noteText)
+                .textFieldStyle(.roundedBorder)
 
             Picker("Category", selection: $viewModel.selectedCategory) {
                 ForEach(AppCategory.allCases) { category in
                     Text(category.rawValue).tag(category)
                 }
             }
+            .pickerStyle(.segmented)
 
             if viewModel.selectedCategory == .reminder {
                 DatePicker(
@@ -46,8 +71,12 @@ struct ContentView: View {
             Button("Review") {
                 viewModel.startReview()
             }
+            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity, alignment: .trailing)
             .disabled(viewModel.noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
+        .padding()
+        .background(.bar)
     }
 
     private var reviewSheet: some View {
@@ -116,84 +145,99 @@ struct ContentView: View {
         }
     }
 
-    private var journalSection: some View {
-        Section("Journal Entries") {
-            if viewModel.journalEntries.isEmpty {
-                Text("No journal entries yet")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(viewModel.journalEntries) { entry in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+    private var historyView: some View {
+        List {
+            Section("Journal Entries") {
+                if viewModel.journalEntries.isEmpty {
+                    Text("No journal entries yet")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.journalEntries) { entry in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(entry.text)
+                        }
+                    }
+                }
+            }
+
+            Section("Reminder Items") {
+                if viewModel.reminderItems.isEmpty {
+                    Text("No reminders yet")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.reminderItems) { item in
+                        reminderRow(for: item)
+                    }
+                }
+            }
+
+            Section("Shopping Items") {
+                if viewModel.shoppingItems.isEmpty {
+                    Text("No shopping items yet")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.shoppingItems) { item in
+                        shoppingRow(for: item)
+                    }
+                }
+            }
+        }
+        .navigationTitle("History")
+    }
+
+    private var activeReminderItems: [ReminderItem] {
+        viewModel.reminderItems.filter { $0.isCompleted == false }
+    }
+
+    private var activeShoppingItems: [ShoppingItem] {
+        viewModel.shoppingItems.filter { $0.isCompleted == false }
+    }
+
+    private func reminderRow(for item: ReminderItem) -> some View {
+        Button {
+            viewModel.toggleReminder(item)
+        } label: {
+            HStack(alignment: .top) {
+                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.text)
+                        .strikethrough(item.isCompleted)
+
+                    if let dueDate = item.dueDate {
+                        Text("Reminder Time: \(dueDate.formatted(date: .abbreviated, time: .shortened))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text(entry.text)
+                    }
+
+                    if let statusText = reminderStatusText(for: item) {
+                        Text(statusText)
+                            .font(.caption)
+                            .foregroundStyle(statusText == "Overdue" ? .red : .blue)
                     }
                 }
+
+                Spacer()
             }
         }
+        .foregroundStyle(item.isCompleted ? .secondary : .primary)
     }
 
-    private var remindersSection: some View {
-        Section("Reminder Items") {
-            if viewModel.reminderItems.isEmpty {
-                Text("No reminders yet")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(viewModel.reminderItems) { item in
-                    Button {
-                        viewModel.toggleReminder(item)
-                    } label: {
-                        HStack(alignment: .top) {
-                            Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.text)
-                                    .strikethrough(item.isCompleted)
-
-                                if let dueDate = item.dueDate {
-                                    Text("Reminder Time: \(dueDate.formatted(date: .abbreviated, time: .shortened))")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                if let statusText = reminderStatusText(for: item) {
-                                    Text(statusText)
-                                        .font(.caption)
-                                        .foregroundStyle(statusText == "Overdue" ? .red : .blue)
-                                }
-                            }
-
-                            Spacer()
-                        }
-                    }
-                    .foregroundStyle(item.isCompleted ? .secondary : .primary)
-                }
+    private func shoppingRow(for item: ShoppingItem) -> some View {
+        Button {
+            viewModel.toggleShoppingItem(item)
+        } label: {
+            HStack {
+                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                Text(item.text)
+                    .strikethrough(item.isCompleted)
+                Spacer()
             }
         }
-    }
-
-    private var shoppingSection: some View {
-        Section("Shopping Items") {
-            if viewModel.shoppingItems.isEmpty {
-                Text("No shopping items yet")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(viewModel.shoppingItems) { item in
-                    Button {
-                        viewModel.toggleShoppingItem(item)
-                    } label: {
-                        HStack {
-                            Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                            Text(item.text)
-                                .strikethrough(item.isCompleted)
-                            Spacer()
-                        }
-                    }
-                    .foregroundStyle(item.isCompleted ? .secondary : .primary)
-                }
-            }
-        }
+        .foregroundStyle(item.isCompleted ? .secondary : .primary)
     }
 
     private func reminderStatusText(for item: ReminderItem) -> String? {
