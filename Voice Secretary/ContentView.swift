@@ -11,21 +11,35 @@ struct ContentView: View {
     @StateObject private var viewModel = AppViewModel()
 
     var body: some View {
+        TabView {
+            homeTab
+                .tabItem {
+                    Label("Home", systemImage: "house")
+                }
+
+            journalTab
+                .tabItem {
+                    Label("Journal", systemImage: "book.closed")
+                }
+
+            historyTab
+                .tabItem {
+                    Label("History", systemImage: "clock")
+                }
+        }
+        .sheet(isPresented: $viewModel.isReviewing) {
+            reviewSheet
+        }
+    }
+
+    private var homeTab: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 activeInbox
                 Divider()
                 inputComposer
             }
-            .navigationTitle("Voice Secretary")
-            .toolbar {
-                NavigationLink("History") {
-                    historyView
-                }
-            }
-            .sheet(isPresented: $viewModel.isReviewing) {
-                reviewSheet
-            }
+            .navigationTitle("Home")
         }
     }
 
@@ -50,15 +64,25 @@ struct ContentView: View {
 
     private var inputComposer: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField("Type a short note", text: $viewModel.noteText)
-                .textFieldStyle(.roundedBorder)
-
-            Picker("Category", selection: $viewModel.selectedCategory) {
-                ForEach(AppCategory.allCases) { category in
-                    Text(category.rawValue).tag(category)
+            HStack(spacing: 8) {
+                Picker("Category", selection: $viewModel.selectedCategory) {
+                    ForEach(AppCategory.allCases) { category in
+                        Text(category.rawValue).tag(category)
+                    }
                 }
+                .pickerStyle(.menu)
+
+                TextField("Tell me something to remember...", text: $viewModel.noteText)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    viewModel.startReview()
+                } label: {
+                    Image(systemName: "paperplane.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .pickerStyle(.segmented)
 
             if viewModel.selectedCategory == .reminder {
                 DatePicker(
@@ -67,13 +91,6 @@ struct ContentView: View {
                     displayedComponents: [.date, .hourAndMinute]
                 )
             }
-
-            Button("Review") {
-                viewModel.startReview()
-            }
-            .buttonStyle(.borderedProminent)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .disabled(viewModel.noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding()
         .background(.bar)
@@ -145,47 +162,56 @@ struct ContentView: View {
         }
     }
 
-    private var historyView: some View {
-        List {
-            Section("Journal Entries") {
-                if viewModel.journalEntries.isEmpty {
-                    Text("No journal entries yet")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.journalEntries) { entry in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(entry.text)
+    private var journalTab: some View {
+        NavigationStack {
+            List {
+                Section("Journal Entries") {
+                    if viewModel.journalEntries.isEmpty {
+                        Text("No journal entries yet")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(viewModel.journalEntries) { entry in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(entry.text)
+                            }
                         }
                     }
                 }
             }
-
-            Section("Reminder Items") {
-                if viewModel.reminderItems.isEmpty {
-                    Text("No reminders yet")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.reminderItems) { item in
-                        reminderRow(for: item)
-                    }
-                }
-            }
-
-            Section("Shopping Items") {
-                if viewModel.shoppingItems.isEmpty {
-                    Text("No shopping items yet")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.shoppingItems) { item in
-                        shoppingRow(for: item)
-                    }
-                }
-            }
+            .navigationTitle("Journal")
         }
-        .navigationTitle("History")
+    }
+
+    private var historyTab: some View {
+        NavigationStack {
+            List {
+                Section("Reminder History") {
+                    if viewModel.reminderItems.isEmpty {
+                        Text("No reminders yet")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(viewModel.reminderItems) { item in
+                            reminderRow(for: item)
+                        }
+                    }
+                }
+
+                Section("Shopping History") {
+                    if viewModel.shoppingItems.isEmpty {
+                        Text("No shopping items yet")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(viewModel.shoppingItems) { item in
+                            shoppingRow(for: item)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("History")
+        }
     }
 
     private var activeReminderItems: [ReminderItem] {

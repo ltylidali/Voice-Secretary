@@ -50,6 +50,7 @@ final class AppViewModel: ObservableObject {
         saveNote(text: trimmedText, category: reviewCategory, reminderTime: reviewReminderDueDate)
 
         noteText = ""
+        selectedCategory = .journal
         reminderDueDate = Date()
         clearReview()
     }
