@@ -20,6 +20,7 @@ final class AppViewModel: ObservableObject {
 
     init() {
         loadItems()
+        NotificationManager.shared.requestPermission()
     }
 
     func saveNote() {
@@ -44,6 +45,7 @@ final class AppViewModel: ObservableObject {
                 isCompleted: false
             )
             reminderItems.insert(item, at: 0)
+            NotificationManager.shared.scheduleReminderNotification(for: item)
         case .shopping:
             let item = ShoppingItem(id: UUID(), text: trimmedText, createdAt: now, isCompleted: false)
             shoppingItems.insert(item, at: 0)
@@ -60,6 +62,13 @@ final class AppViewModel: ObservableObject {
         }
 
         reminderItems[index].isCompleted.toggle()
+
+        if reminderItems[index].isCompleted {
+            NotificationManager.shared.cancelReminderNotification(for: reminderItems[index])
+        } else {
+            NotificationManager.shared.scheduleReminderNotification(for: reminderItems[index])
+        }
+
         saveItems()
     }
 
