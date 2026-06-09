@@ -10,10 +10,21 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = AppViewModel()
     @State private var selectedHistoryType: HistoryType = .reminders
+    @State private var selectedHistorySort: HistorySort = .defaultOrder
 
     private enum HistoryType: String, CaseIterable, Identifiable {
         case reminders = "Reminders"
         case shopping = "Shopping"
+
+        var id: String {
+            rawValue
+        }
+    }
+
+    private enum HistorySort: String, CaseIterable, Identifiable {
+        case defaultOrder = "Default"
+        case byTime = "By Time"
+        case byAdded = "By Added"
 
         var id: String {
             rawValue
@@ -207,6 +218,13 @@ struct ContentView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+
+                    Picker("Sort", selection: $selectedHistorySort) {
+                        ForEach(HistorySort.allCases) { sort in
+                            Text(sort.rawValue).tag(sort)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                 }
 
                 if selectedHistoryType == .reminders {
@@ -246,14 +264,56 @@ struct ContentView: View {
     }
 
     private var historyReminderItems: [ReminderItem] {
-        viewModel.reminderItems.sorted { first, second in
-            first.isCompleted && second.isCompleted == false
+        switch selectedHistorySort {
+        case .defaultOrder:
+            return viewModel.reminderItems.sorted { first, second in
+                if first.isCompleted != second.isCompleted {
+                    return first.isCompleted == false
+                }
+
+                return isReminderTimeEarlier(first, than: second)
+            }
+        case .byTime:
+            return viewModel.reminderItems.sorted { first, second in
+                isReminderTimeEarlier(first, than: second)
+            }
+        case .byAdded:
+            return viewModel.reminderItems.sorted { first, second in
+                first.createdAt > second.createdAt
+            }
         }
     }
 
     private var historyShoppingItems: [ShoppingItem] {
-        viewModel.shoppingItems.sorted { first, second in
-            first.isCompleted && second.isCompleted == false
+        switch selectedHistorySort {
+        case .defaultOrder:
+            return viewModel.shoppingItems.sorted { first, second in
+                if first.isCompleted != second.isCompleted {
+                    return first.isCompleted == false
+                }
+
+                return first.createdAt > second.createdAt
+            }
+        case .byTime, .byAdded:
+            return viewModel.shoppingItems.sorted { first, second in
+                first.createdAt > second.createdAt
+            }
+        }
+    }
+
+    private func isReminderTimeEarlier(_ first: ReminderItem, than second: ReminderItem) -> Bool {
+        switch (first.dueDate, second.dueDate) {
+        case let (firstDate?, secondDate?):
+            if firstDate != secondDate {
+                return firstDate < secondDate
+            }
+            return first.createdAt > second.createdAt
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        case (nil, nil):
+            return first.createdAt > second.createdAt
         }
     }
 
