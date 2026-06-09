@@ -19,6 +19,9 @@ struct ContentView: View {
                 shoppingSection
             }
             .navigationTitle("Voice Secretary")
+            .sheet(isPresented: $viewModel.isReviewing) {
+                reviewSheet
+            }
         }
     }
 
@@ -40,10 +43,76 @@ struct ContentView: View {
                 )
             }
 
-            Button("Save") {
-                viewModel.saveNote()
+            Button("Review") {
+                viewModel.startReview()
             }
             .disabled(viewModel.noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    private var reviewSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 20) {
+                reviewSummary
+
+                Spacer()
+
+                Button("Confirm Save") {
+                    viewModel.confirmSave()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+                .disabled(viewModel.reviewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button("Edit", role: .cancel) {
+                    viewModel.cancelReview()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+            }
+            .padding()
+            .navigationTitle("Review Before Saving")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium])
+    }
+
+    private var reviewSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(reviewTitle)
+                .font(.headline)
+
+            Text(viewModel.reviewText)
+                .font(.body)
+
+            if viewModel.reviewCategory == .journal {
+                Text("Saved with current date/time")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            if viewModel.reviewCategory == .reminder {
+                Text("Reminder Time: \(viewModel.reviewReminderDueDate.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Text(viewModel.reviewReminderDueDate > Date() ? "A notification will be scheduled." : "No notification will be scheduled.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var reviewTitle: String {
+        switch viewModel.reviewCategory {
+        case .journal:
+            return "Save as Journal Entry"
+        case .reminder:
+            return "Save as Reminder"
+        case .shopping:
+            return "Add to Shopping List"
         }
     }
 

@@ -12,6 +12,10 @@ final class AppViewModel: ObservableObject {
     @Published var noteText = ""
     @Published var selectedCategory: AppCategory = .journal
     @Published var reminderDueDate = Date()
+    @Published var isReviewing = false
+    @Published var reviewText = ""
+    @Published var reviewCategory: AppCategory = .journal
+    @Published var reviewReminderDueDate = Date()
     @Published private(set) var journalEntries: [JournalEntry] = []
     @Published private(set) var reminderItems: [ReminderItem] = []
     @Published private(set) var shoppingItems: [ShoppingItem] = []
@@ -23,37 +27,67 @@ final class AppViewModel: ObservableObject {
         NotificationManager.shared.requestPermission()
     }
 
-    func saveNote() {
+    func startReview() {
         let trimmedText = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard trimmedText.isEmpty == false else {
             return
         }
 
+        reviewText = trimmedText
+        reviewCategory = selectedCategory
+        reviewReminderDueDate = reminderDueDate
+        isReviewing = true
+    }
+
+    func confirmSave() {
+        let trimmedText = reviewText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard trimmedText.isEmpty == false else {
+            return
+        }
+
+        saveNote(text: trimmedText, category: reviewCategory, reminderTime: reviewReminderDueDate)
+
+        noteText = ""
+        reminderDueDate = Date()
+        clearReview()
+    }
+
+    func cancelReview() {
+        clearReview()
+    }
+
+    private func saveNote(text: String, category: AppCategory, reminderTime: Date) {
         let now = Date()
 
-        switch selectedCategory {
+        switch category {
         case .journal:
-            let entry = JournalEntry(id: UUID(), text: trimmedText, createdAt: now)
+            let entry = JournalEntry(id: UUID(), text: text, createdAt: now)
             journalEntries.insert(entry, at: 0)
         case .reminder:
             let item = ReminderItem(
                 id: UUID(),
-                text: trimmedText,
+                text: text,
                 createdAt: now,
-                dueDate: reminderDueDate,
+                dueDate: reminderTime,
                 isCompleted: false
             )
             reminderItems.insert(item, at: 0)
             NotificationManager.shared.scheduleReminderNotification(for: item)
         case .shopping:
-            let item = ShoppingItem(id: UUID(), text: trimmedText, createdAt: now, isCompleted: false)
+            let item = ShoppingItem(id: UUID(), text: text, createdAt: now, isCompleted: false)
             shoppingItems.insert(item, at: 0)
         }
 
-        noteText = ""
-        reminderDueDate = Date()
         saveItems()
+    }
+
+    private func clearReview() {
+        isReviewing = false
+        reviewText = ""
+        reviewCategory = .journal
+        reviewReminderDueDate = Date()
     }
 
     func toggleReminder(_ item: ReminderItem) {
