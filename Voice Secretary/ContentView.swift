@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var selectedHistorySort: HistorySort = .defaultOrder
     @State private var completingReminderIDs: Set<UUID> = []
     @State private var completingShoppingIDs: Set<UUID> = []
+    @State private var showJournalSavedMessage = false
 
     private enum HistoryType: String, CaseIterable, Identifiable {
         case reminders = "Reminders"
@@ -97,6 +98,13 @@ struct ContentView: View {
 
     private var inputComposer: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if showJournalSavedMessage {
+                Label("Saved to Journal", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.green)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
             HStack(alignment: .bottom, spacing: 8) {
                 Picker("Category", selection: $viewModel.selectedCategory) {
                     ForEach(AppCategory.allCases) { category in
@@ -110,7 +118,7 @@ struct ContentView: View {
                     .lineLimit(1...8)
 
                 Button {
-                    viewModel.startReview()
+                    handleComposerSubmit()
                 } label: {
                     Image(systemName: "paperplane.fill")
                 }
@@ -128,6 +136,28 @@ struct ContentView: View {
         }
         .padding()
         .background(.bar)
+    }
+
+    private func handleComposerSubmit() {
+        if viewModel.selectedCategory == .journal {
+            if viewModel.saveJournalEntryFromComposer() {
+                showSavedToJournalMessage()
+            }
+        } else {
+            viewModel.startReview()
+        }
+    }
+
+    private func showSavedToJournalMessage() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showJournalSavedMessage = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showJournalSavedMessage = false
+            }
+        }
     }
 
     private var reviewSheet: some View {

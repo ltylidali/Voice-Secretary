@@ -40,6 +40,22 @@ final class AppViewModel: ObservableObject {
         isReviewing = true
     }
 
+    func saveJournalEntryFromComposer() -> Bool {
+        let trimmedText = noteText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard trimmedText.isEmpty == false else {
+            return false
+        }
+
+        saveNote(text: trimmedText, category: .journal, reminderTime: reminderDueDate)
+
+        noteText = ""
+        selectedCategory = .journal
+        reminderDueDate = Date()
+
+        return true
+    }
+
     func confirmSave() {
         let trimmedText = reviewText.trimmingCharacters(in: .whitespacesAndNewlines)
 
