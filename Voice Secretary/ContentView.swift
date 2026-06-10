@@ -11,6 +11,8 @@ struct ContentView: View {
     @StateObject private var viewModel = AppViewModel()
     @State private var selectedHistoryType: HistoryType = .reminders
     @State private var selectedHistorySort: HistorySort = .defaultOrder
+    @State private var completingReminderIDs: Set<UUID> = []
+    @State private var completingShoppingIDs: Set<UUID> = []
 
     private enum HistoryType: String, CaseIterable, Identifiable {
         case reminders = "Reminders"
@@ -72,11 +74,21 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(activeReminderItems) { item in
-                        reminderRow(for: item)
+                        reminderRow(
+                            for: item,
+                            isCompleting: completingReminderIDs.contains(item.id)
+                        ) {
+                            completeReminderFromHome(item)
+                        }
                     }
 
                     ForEach(activeShoppingItems) { item in
-                        shoppingRow(for: item)
+                        shoppingRow(
+                            for: item,
+                            isCompleting: completingShoppingIDs.contains(item.id)
+                        ) {
+                            completeShoppingFromHome(item)
+                        }
                     }
                 }
             }
@@ -219,12 +231,22 @@ struct ContentView: View {
                     }
                     .pickerStyle(.segmented)
 
-                    Picker("Sort", selection: $selectedHistorySort) {
-                        ForEach(HistorySort.allCases) { sort in
-                            Text(sort.rawValue).tag(sort)
+                    HStack {
+                        Text("Sort: \(selectedHistorySort.rawValue)")
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Menu {
+                            ForEach(HistorySort.allCases) { sort in
+                                Button(sort.rawValue) {
+                                    selectedHistorySort = sort
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down")
                         }
                     }
-                    .pickerStyle(.segmented)
                 }
 
                 if selectedHistoryType == .reminders {
@@ -317,16 +339,72 @@ struct ContentView: View {
         }
     }
 
-    private func reminderRow(for item: ReminderItem) -> some View {
-        Button {
-            viewModel.toggleReminder(item)
+    private func completeReminderFromHome(_ item: ReminderItem) {
+        guard completingReminderIDs.contains(item.id) == false else {
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            _ = completingReminderIDs.insert(item.id)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard let currentItem = viewModel.reminderItems.first(where: { $0.id == item.id }),
+                  currentItem.isCompleted == false else {
+                completingReminderIDs.remove(item.id)
+                return
+            }
+
+            withAnimation(.easeInOut(duration: 0.25)) {
+                viewModel.toggleReminder(currentItem)
+                completingReminderIDs.remove(item.id)
+            }
+        }
+    }
+
+    private func completeShoppingFromHome(_ item: ShoppingItem) {
+        guard completingShoppingIDs.contains(item.id) == false else {
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            _ = completingShoppingIDs.insert(item.id)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            guard let currentItem = viewModel.shoppingItems.first(where: { $0.id == item.id }),
+                  currentItem.isCompleted == false else {
+                completingShoppingIDs.remove(item.id)
+                return
+            }
+
+            withAnimation(.easeInOut(duration: 0.25)) {
+                viewModel.toggleShoppingItem(currentItem)
+                completingShoppingIDs.remove(item.id)
+            }
+        }
+    }
+
+    private func reminderRow(
+        for item: ReminderItem,
+        isCompleting: Bool = false,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        let isCompleted = item.isCompleted || isCompleting
+
+        return Button {
+            if let action = action {
+                action()
+            } else {
+                viewModel.toggleReminder(item)
+            }
         } label: {
             HStack(alignment: .top) {
-                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.text)
-                        .strikethrough(item.isCompleted)
+                        .strikethrough(isCompleted)
 
                     if let dueDate = item.dueDate {
                         Text("Reminder Time: \(dueDate.formatted(date: .abbreviated, time: .shortened))")
@@ -344,21 +422,33 @@ struct ContentView: View {
                 Spacer()
             }
         }
-        .foregroundStyle(item.isCompleted ? .secondary : .primary)
+        .foregroundStyle(isCompleted ? .secondary : .primary)
+        .opacity(isCompleting ? 0.6 : 1)
     }
 
-    private func shoppingRow(for item: ShoppingItem) -> some View {
-        Button {
-            viewModel.toggleShoppingItem(item)
+    private func shoppingRow(
+        for item: ShoppingItem,
+        isCompleting: Bool = false,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        let isCompleted = item.isCompleted || isCompleting
+
+        return Button {
+            if let action = action {
+                action()
+            } else {
+                viewModel.toggleShoppingItem(item)
+            }
         } label: {
             HStack {
-                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                 Text(item.text)
-                    .strikethrough(item.isCompleted)
+                    .strikethrough(isCompleted)
                 Spacer()
             }
         }
-        .foregroundStyle(item.isCompleted ? .secondary : .primary)
+        .foregroundStyle(isCompleted ? .secondary : .primary)
+        .opacity(isCompleting ? 0.6 : 1)
     }
 
     private func reminderStatusText(for item: ReminderItem) -> String? {
