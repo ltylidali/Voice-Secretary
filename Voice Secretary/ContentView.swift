@@ -97,7 +97,7 @@ struct ContentView: View {
 
     private var inputComposer: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+            HStack(alignment: .bottom, spacing: 8) {
                 Picker("Category", selection: $viewModel.selectedCategory) {
                     ForEach(AppCategory.allCases) { category in
                         Text(category.rawValue).tag(category)
@@ -105,8 +105,9 @@ struct ContentView: View {
                 }
                 .pickerStyle(.menu)
 
-                TextField("Tell me something to remember...", text: $viewModel.noteText)
+                TextField("Tell me something to remember...", text: $viewModel.noteText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
+                    .lineLimit(1...8)
 
                 Button {
                     viewModel.startReview()
@@ -132,9 +133,11 @@ struct ContentView: View {
     private var reviewSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
-                reviewSummary
-
-                Spacer()
+                ScrollView {
+                    reviewSummary
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 260)
 
                 HStack {
                     Button("Edit", role: .cancel) {
@@ -157,7 +160,8 @@ struct ContentView: View {
             .navigationTitle("Review Before Saving")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.height(reviewSheetHeight), .medium])
+        .presentationDragIndicator(.visible)
     }
 
     private var reviewSummary: some View {
@@ -197,6 +201,12 @@ struct ContentView: View {
         }
     }
 
+    private var reviewSheetHeight: CGFloat {
+        let baseHeight: CGFloat = viewModel.reviewCategory == .reminder ? 300 : 250
+        let extraTextHeight = CGFloat(viewModel.reviewText.count / 40) * 20
+        return min(baseHeight + extraTextHeight, 520)
+    }
+
     private var journalTab: some View {
         NavigationStack {
             List {
@@ -230,27 +240,10 @@ struct ContentView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-
-                    HStack {
-                        Text("Sort: \(selectedHistorySort.rawValue)")
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Menu {
-                            ForEach(HistorySort.allCases) { sort in
-                                Button(sort.rawValue) {
-                                    selectedHistorySort = sort
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down")
-                        }
-                    }
                 }
 
                 if selectedHistoryType == .reminders {
-                    Section("Reminder History") {
+                    Section {
                         if viewModel.reminderItems.isEmpty {
                             Text("No reminders yet")
                                 .foregroundStyle(.secondary)
@@ -259,9 +252,11 @@ struct ContentView: View {
                                 reminderRow(for: item)
                             }
                         }
+                    } header: {
+                        historySectionHeader(title: "Reminder History")
                     }
                 } else {
-                    Section("Shopping History") {
+                    Section {
                         if viewModel.shoppingItems.isEmpty {
                             Text("No shopping items yet")
                                 .foregroundStyle(.secondary)
@@ -270,10 +265,37 @@ struct ContentView: View {
                                 shoppingRow(for: item)
                             }
                         }
+                    } header: {
+                        historySectionHeader(title: "Shopping History")
                     }
                 }
             }
             .navigationTitle("History")
+        }
+    }
+
+    private func historySectionHeader(title: String) -> some View {
+        HStack {
+            Text(title)
+
+            Spacer()
+
+            Menu {
+                ForEach(HistorySort.allCases) { sort in
+                    Button {
+                        selectedHistorySort = sort
+                    } label: {
+                        if selectedHistorySort == sort {
+                            Label(sort.rawValue, systemImage: "checkmark")
+                        } else {
+                            Text(sort.rawValue)
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down")
+                    .font(.body)
+            }
         }
     }
 
